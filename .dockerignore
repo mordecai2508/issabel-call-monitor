@@ -1,0 +1,8 @@
+**/node_modules
+frontend/dist
+backend/config.json
+backend/db/*.sqlite*
+backend/uploads/*
+!backend/uploads/.gitkeep
+.git
+*.log

@@ -1,0 +1,54 @@
+{
+  "db": {
+    "host": "192.168.x.x",
+    "port": 3306,
+    "user": "asterisk",
+    "password": "yourpassword",
+    "database": "asteriskcdrdb",
+    "timezone": "-05:00",
+    "connectionLimit": 3,
+    "_comment_connectionLimit": "Máximo de conexiones simultáneas del pool contra la BD del PBX. Default 3. Valores altos pueden saturar la CPU del Issabel."
+  },
+  "ami": {
+    "_comment": "El usuario AMI configurado en manager.conf debe incluir la clase 'reporting' en sus permisos de lectura, por ejemplo: read = system,call,agent,user,reporting. Sin la clase 'reporting', la accion AMI 'SIPpeers' (usada para el estado de extensiones) puede fallar o devolver una lista vacia.",
+    "host": "192.168.x.x",
+    "port": 5038,
+    "username": "monitor-readonly",
+    "password": "yourpassword"
+  },
+  "server": {
+    "port": 4000,
+    "sessionSecret": "cambia-esto-por-una-cadena-aleatoria-larga-y-segura",
+    "pollIntervalMs": 60000,
+    "_comment_pollIntervalMs": "Intervalo de broadcast SSE en ms. Default 60000. Mínimo forzado: 15000."
+  },
+  "app": {
+    "name": "Call Monitor"
+  },
+  "channels": { "inbound": [], "outbound": ["SIP/SALIENTE_CALL"] },
+  "channelAliases": {},
+  "queues": ["8000", "8300"],
+  "lostDestinations": ["s", "hang", "hangup"],
+  "smtp": {
+    "host": "",
+    "port": 587,
+    "secure": false,
+    "user": "alerts@example.com",
+    "password": "",
+    "from": "Issabel Monitor <alerts@example.com>"
+  },
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password": "admin123",
+      "role": "admin"
+    },
+    {
+      "id": 2,
+      "username": "monitor",
+      "password": "monitor123",
+      "role": "monitor"
+    }
+  ]
+}

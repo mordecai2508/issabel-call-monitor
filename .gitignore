@@ -1,0 +1,11 @@
+node_modules/
+frontend/dist/
+backend/config.json
+backend/db/monitor.sqlite
+backend/db/monitor.sqlite-shm
+backend/db/monitor.sqlite-wal
+backend/uploads/*
+!backend/uploads/.gitkeep
+.env
+*.log
+coverage/
