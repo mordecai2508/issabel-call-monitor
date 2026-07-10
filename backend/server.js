@@ -442,6 +442,7 @@ async function startServer() {
   }));
   app.use(express.json());
   app.use(session({
+    name:              config.server.cookieName || 'connect.sid',
     secret:            config.server.sessionSecret,
     resave:            false,
     saveUninitialized: false,
@@ -566,7 +567,7 @@ async function startServer() {
       });
     }
     req.session.destroy(() => {
-      res.clearCookie('connect.sid');
+      res.clearCookie(config.server.cookieName || 'connect.sid');
       res.json({ ok: true });
     });
   });

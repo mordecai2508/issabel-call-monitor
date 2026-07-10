@@ -19,6 +19,8 @@
   "server": {
     "port": 4000,
     "sessionSecret": "cambia-esto-por-una-cadena-aleatoria-larga-y-segura",
+    "cookieName": "connect.sid",
+    "_comment_cookieName": "Nombre de la cookie de sesión. Las cookies del navegador NO se aíslan por puerto, así que si despliegas varias instancias en el mismo host debes darle a cada una un nombre único (ej. callmon_serverA, callmon_serverB); de lo contrario cada login pisa la sesión de las demás.",
     "pollIntervalMs": 60000,
     "_comment_pollIntervalMs": "Intervalo de broadcast SSE en ms. Default 60000. Mínimo forzado: 15000."
   },
