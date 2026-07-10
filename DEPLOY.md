@@ -30,7 +30,19 @@ cd call-monitor
 cp backend/config.example.json backend/config.json
 ```
 
-Edita `backend/config.json` con los datos del nuevo servidor:
+Edita `backend/config.json` con los datos del nuevo servidor: 
+
+### 2.A Cookie Name y Puerto
+```json
+"server": {
+    "port": 4000, 
+    "sessionSecret": "cambia-esto-por-una-cadena-aleatoria-larga-y-segura",
+    "cookieName": "connect.sid",
+    "_comment_cookieName": "Nombre de la cookie de sesión. Las cookies del navegador NO se aíslan por puerto, así que si despliegas varias instancias en el mismo host debes darle a cada una un nombre único (ej. callmon_serverA, callmon_serverB); de lo contrario cada login pisa la sesión de las demás.",
+    "pollIntervalMs": 60000,
+    "_comment_pollIntervalMs": "Intervalo de broadcast SSE en ms. Default 60000. Mínimo forzado: 15000."
+  },
+```
 
 ### 2.1 Base de datos MySQL (Issabel)
 
@@ -58,6 +70,7 @@ FLUSH PRIVILEGES;
 ```
 
 ### 2.2 AMI — Asterisk Manager Interface
+(Importante, si se esta utlizando Issabel5 la creación de este usuario se debe realizar desde la GUI)
 
 ```json
 "ami": {
@@ -173,6 +186,34 @@ Si no necesitas alertas por correo, deja los campos vacíos. El sistema funciona
 cd /frontend
 npm install esbuild@0.28.1
 npm install
+
+# Modificar el docker-compose.yml
+
+name: <nombre personalizado> #Definir un nombre personalizado para que no genere conflicto con otros contenedores
+services:
+  call-monitor:
+    build: .
+    container_name: call-monitor
+    restart: unless-stopped
+    ports:
+      - "4000:4000" # Cambiar el puerto si es necesario, teniendo en cuenta si se modificó el puerto del config.json
+    volumes:
+      # config.json contiene credenciales — debe existir en el host antes de `docker compose up`
+      - ./backend/config.json:/app/backend/config.json:ro
+      # Persistencia de datos entre reinicios y recreaciones del contenedor
+      - monitor-db:/app/backend/db
+      - monitor-uploads:/app/backend/uploads
+
+volumes:
+  monitor-db:
+  monitor-uploads:
+
+# Modificar el Dockerfile
+RUN mkdir -p db uploads
+
+EXPOSE 4000 # Recomendable cambiar el puerto al mismo que se define en el config.json y en el docker-compose.yml
+CMD ["node", "server.js"]
+
 
 # Construir la imagen
 
