@@ -4,6 +4,7 @@ import { api } from '../api';
 import { DispositionChart } from './DispositionChart';
 import { HourlyChart } from './HourlyChart';
 import { ChannelTable } from './ChannelTable';
+import QueueCard from './QueueCard';
 import { StatCard } from './StatCard';
 import { Phone, PhoneCall, PhoneMissed, PhoneIncoming, PhoneOutgoing } from 'lucide-react';
 import { useAppConfig } from '../contexts/AppConfigContext';
@@ -50,6 +51,7 @@ export default function HistoricalView() {
   const total          = data?.stats?.total ?? 0;
   const hourly         = data?.hourly   ?? [];
   const channelAliases = data?.channelAliases ?? {};
+  const queues         = data?.queues   ?? [];
 
   // Solo mostrar canales definidos en el módulo de Canales (inbound u outbound configurados).
   // passesFilter(direction=null) devuelve todos los canales del CDR incluyendo no configurados;
@@ -217,6 +219,13 @@ export default function HistoricalView() {
               hint="Total de llamadas realizadas hacia el exterior en el período seleccionado." />
           </div>
 
+          {/* Colas de entrada (sin repetir Perdidas que ya aparece arriba) */}
+          {queues.filter(q => q.queue !== '__lost__').length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {queues.filter(q => q.queue !== '__lost__').map(q => <QueueCard key={q.queue} queue={q} />)}
+            </div>
+          )}
+
           {/* Gráficas */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <div className="card lg:col-span-2">
@@ -230,13 +239,15 @@ export default function HistoricalView() {
           </div>
 
           {/* Tabla canales */}
-          <div className="card">
-            <h2 className="text-sm font-semibold text-slate-200 mb-4">
-              Por canal
-              <span className="ml-2 text-xs font-normal text-slate-500">({channels.length} canales)</span>
-            </h2>
-            <ChannelTable channels={channels} channelAliases={channelAliases} />
-          </div>
+          {channels.length > 0 && (
+            <div className="card">
+              <h2 className="text-sm font-semibold text-slate-200 mb-4">
+                Estadísticas por canal
+                <span className="ml-2 text-xs font-normal text-slate-500">({channels.length} canales)</span>
+              </h2>
+              <ChannelTable channels={channels} channelAliases={channelAliases} />
+            </div>
+          )}
         </div>
       )}
 

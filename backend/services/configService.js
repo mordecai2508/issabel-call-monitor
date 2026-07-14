@@ -326,6 +326,36 @@ function setChannelAlias(db, channel, alias) {
   setConfigValue(db, 'channel_aliases', JSON.stringify(aliases));
 }
 
+/**
+ * Read all queue aliases stored in SQLite.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @returns {Record<string, string>}
+ */
+function getQueueAliases(db) {
+  const raw = getConfigValue(db, 'queue_aliases', null);
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch { return {}; }
+}
+
+/**
+ * Set or clear a single queue alias in SQLite.
+ * Passing an empty/blank alias removes the entry.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @param {string} queue
+ * @param {string} alias
+ */
+function setQueueAlias(db, queue, alias) {
+  const aliases = getQueueAliases(db);
+  if (alias && alias.trim()) {
+    aliases[queue] = alias.trim();
+  } else {
+    delete aliases[queue];
+  }
+  setConfigValue(db, 'queue_aliases', JSON.stringify(aliases));
+}
+
 module.exports = {
   getConfigValue,
   setConfigValue,
@@ -342,4 +372,6 @@ module.exports = {
   setBusinessHours,
   getChannelAliases,
   setChannelAlias,
+  getQueueAliases,
+  setQueueAlias,
 };

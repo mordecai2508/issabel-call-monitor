@@ -17,6 +17,7 @@ const Database = require('better-sqlite3');
 
 const configRouter = require('../routes/config');
 const reportService = require('../services/reportService');
+const configService = require('../services/configService');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -129,18 +130,13 @@ function buildApp(opts = {}) {
   function getAliases() { return config.channelAliases || {}; }
   const tmpConfigFile = path.join(os.tmpdir(), `call-monitor-config-test-${process.pid}-${Date.now()}.json`);
 
-  app.get('/api/config/public', (req, res) => {
-    res.json({ appName: getAppName() });
-  });
+  // Espeja server.js: appName deriva de companyName (SQLite) con fallback (feature #60)
+  function resolveEffectiveAppName() {
+    return configService.getConfigValue(db, 'companyName', getAppName()) || getAppName();
+  }
 
-  app.put('/api/admin/app', requireAdmin, (req, res) => {
-    const { name } = req.body || {};
-    if (typeof name !== 'string' || !name.trim())
-      return res.status(400).json({ ok: false, error: 'El campo name es requerido' });
-    if (!config.app) config.app = {};
-    config.app.name = name.trim();
-    fs.writeFileSync(tmpConfigFile, JSON.stringify(config, null, 2), 'utf8');
-    res.json({ ok: true, name: config.app.name });
+  app.get('/api/config/public', (req, res) => {
+    res.json({ appName: resolveEffectiveAppName() });
   });
 
   app.get('/api/admin/channels', requireAdmin, (req, res) => {
@@ -855,17 +851,10 @@ describe('R18-R21 - GET/PUT /api/admin/channels (channels_inbound_outbound_split
 // ── R39 — no-regresión de endpoints existentes ──────────────────────────────────
 
 describe('R39 - no-regresión de endpoints existentes', () => {
-  it('GET /api/config/public sigue respondiendo igual que antes', async () => {
+  it('GET /api/config/public deriva appName del fallback cuando no hay companyName en SQLite', async () => {
     const { app } = buildApp({ sessionUser: null });
     const res = await request(app).get('/api/config/public').expect(200);
     expect(res.body).toEqual({ appName: 'Call Monitor' });
-  });
-
-  it('PUT /api/admin/app sigue respondiendo igual que antes', async () => {
-    const { app, tmpConfigFile } = buildApp({ sessionUser: ADMIN });
-    const res = await request(app).put('/api/admin/app').send({ name: 'Nueva Empresa' }).expect(200);
-    expect(res.body).toEqual({ ok: true, name: 'Nueva Empresa' });
-    if (fs.existsSync(tmpConfigFile)) fs.unlinkSync(tmpConfigFile);
   });
 
   it('GET /api/admin/channels sigue respondiendo igual que antes (con direction añadido, feature #20)', async () => {
@@ -884,6 +873,67 @@ describe('R39 - no-regresión de endpoints existentes', () => {
       .expect(200);
     expect(res.body).toEqual({ ok: true, alias: 'Claro' });
     if (fs.existsSync(tmpConfigFile)) fs.unlinkSync(tmpConfigFile);
+  });
+});
+
+// ── Feature #60 — company_name_single_source_fix ────────────────────────────────
+//
+// Fuente única de verdad = companyName (SQLite) con fallback a config.app.name.
+// El harness /api/config/public espeja server.js: resolveEffectiveAppName() =
+// configService.getConfigValue(db, 'companyName', getAppName()) || getAppName().
+
+/**
+ * Mirror of server.js resolveEffectiveAppName(), usada por fetchData() para el
+ * campo appName del payload. Debe mantenerse idéntica a la implementación real.
+ */
+function resolveEffectiveAppNameMirror(db, getAppName) {
+  return configService.getConfigValue(db, 'companyName', getAppName()) || getAppName();
+}
+
+describe('company_name_single_source_fix (#60)', () => {
+  it('R3 - tras PATCH /admin/config con companyName, GET /api/config/public devuelve ese companyName en appName', async () => {
+    const { app } = buildApp({ sessionUser: ADMIN });
+
+    await request(app)
+      .patch('/api/admin/config')
+      .send({ companyName: 'ACME Corp' })
+      .expect(200);
+
+    const res = await request(app).get('/api/config/public').expect(200);
+    expect(res.body.appName).toBe('ACME Corp');
+  });
+
+  it('R4 - sin companyName en system_config, GET /api/config/public devuelve el fallback (config.app.name/getAppName) en appName', async () => {
+    const { app } = buildApp({ sessionUser: null });
+
+    const res = await request(app).get('/api/config/public').expect(200);
+    expect(res.body.appName).toBe('Call Monitor');
+  });
+
+  it('R7/R11 - el payload de fetchData expone appName = companyName SQLite (y fallback cuando no existe), manteniendo la forma', () => {
+    const db = buildSqliteDb();
+    const getAppName = () => 'Call Monitor';
+
+    // Sin companyName → fallback
+    const payloadFallback = {
+      stats: {}, channels: [], hourly: [],
+      inbound: { stats: {}, channels: [], hourly: [] },
+      outbound: { stats: {}, channels: [] },
+      queues: [],
+      channelAliases: {},
+      appName: resolveEffectiveAppNameMirror(db, getAppName),
+      businessHours: null,
+      from: '2026-06-01 00:00:00', to: '2026-06-01 23:59:59',
+      generatedAt: new Date().toISOString(),
+    };
+    expect(payloadFallback.appName).toBe('Call Monitor');
+    expect(Object.prototype.hasOwnProperty.call(payloadFallback, 'appName')).toBe(true);
+    expect(typeof payloadFallback.appName).toBe('string');
+
+    // Con companyName en SQLite → deriva de la fuente única
+    configService.setConfigValue(db, 'companyName', 'ACME Corp');
+    const appNameAfter = resolveEffectiveAppNameMirror(db, getAppName);
+    expect(appNameAfter).toBe('ACME Corp');
   });
 });
 

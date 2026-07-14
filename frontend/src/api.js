@@ -22,8 +22,9 @@ export const api = {
   adminChannels: ()                   => req('GET',  '/api/admin/channels'),
   updateChannelAlias: (channel, alias) =>
     req('PUT', '/api/admin/channels', { channel, alias }),
+  adminQueues:       ()             => req('GET', '/api/admin/queues'),
+  updateQueueAlias:  (queue, alias) => req('PUT', '/api/admin/queues', { queue, alias }),
   publicConfig:  ()                   => req('GET',  '/api/config/public'),
-  updateAppName: (name)               => req('PUT',  '/api/admin/app', { name }),
   // User management
   createUser:       (data)            => req('POST',  '/api/admin/users', data),
   updateUser:       (id, data)        => req('PATCH', `/api/admin/users/${id}`, data),

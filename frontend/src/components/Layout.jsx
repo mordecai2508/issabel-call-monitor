@@ -4,9 +4,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { AppConfigContext } from '../contexts/AppConfigContext';
 import {
   Phone, LayoutDashboard, History,
-  LogOut, Shield, Eye, PhoneCall, Pencil, Check, X,
+  LogOut, Shield, Eye, PhoneCall,
   PhoneIncoming, PhoneOutgoing, Users, Search, BarChart2, FileText, Settings,
-  Bell, BellRing, Puzzle,
+  Bell, BellRing, Puzzle, Layers,
 } from 'lucide-react';
 import { api } from '../api';
 import { useSSE } from '../hooks/useSSE';
@@ -41,9 +41,6 @@ export default function Layout() {
   const [appName, setAppName]             = useState('Call Monitor');
   const [subcompanyName, setSubcompanyName] = useState('');
   const [dbTimezone, setDbTimezone]       = useState(null);
-  const [editing, setEditing]             = useState(false);
-  const [editValue, setEditValue]         = useState('');
-  const [saving, setSaving]               = useState(false);
 
   // PBX connection status (feature pbx_health, R14/R16/R17)
   const [pbxStatus, setPbxStatus] = useState(null);
@@ -88,18 +85,6 @@ export default function Layout() {
     onPluginsChanged: () => refreshPlugins(),
   });
 
-  async function saveAppName() {
-    if (!editValue.trim()) { setEditing(false); return; }
-    setSaving(true);
-    try {
-      const res = await api.updateAppName(editValue);
-      setAppName(res.name);
-    } finally {
-      setSaving(false);
-      setEditing(false);
-    }
-  }
-
   async function handleLogout() {
     await logout();
     navigate('/login');
@@ -117,38 +102,7 @@ export default function Layout() {
             <Phone className="w-4 h-4 text-white" />
           </div>
           <div className="flex-1 overflow-hidden">
-            {editing ? (
-              <div className="flex items-center gap-1">
-                <input
-                  autoFocus
-                  value={editValue}
-                  onChange={e => setEditValue(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter')  saveAppName();
-                    if (e.key === 'Escape') setEditing(false);
-                  }}
-                  className="w-full bg-slate-700 border border-slate-500 rounded px-1.5 py-0.5 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
-                />
-                <button onClick={saveAppName} disabled={saving} className="text-emerald-400 hover:text-emerald-300">
-                  <Check className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => setEditing(false)} className="text-slate-500 hover:text-slate-300">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1">
-                <div className="text-sm font-semibold text-slate-100 leading-none truncate">{appName}</div>
-                {user?.role === 'admin' && (
-                  <button
-                    onClick={() => { setEditValue(appName); setEditing(true); }}
-                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition-opacity"
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            )}
+            <div className="text-lg font-semibold text-slate-100 leading-tight truncate">{appName}</div>
             {subcompanyName && (
               <div className="text-xs text-slate-500 leading-none mt-0.5">{subcompanyName}</div>
             )}
@@ -184,6 +138,7 @@ export default function Layout() {
             <>
               <p className="text-xs text-slate-600 uppercase tracking-wider px-3 mb-2 mt-4">Admin</p>
               <NavItem to="/channels"    icon={PhoneCall} label="Canales" />
+              <NavItem to="/queues"      icon={Layers}    label="Colas" />
               <NavItem to="/admin/users" icon={Users}     label="Usuarios" />
               <NavItem to="/admin/config" icon={Settings} label="Configuración" />
               <NavItem to="/admin/alerts" icon={BellRing} label="Reglas de alerta" />

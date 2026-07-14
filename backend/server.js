@@ -331,7 +331,7 @@ async function queryHourly(pool, from, to, inboundChannels, outboundChannels, di
   return hours;
 }
 
-async function queryQueues(pool, from, to, inboundChannels, outboundChannels, queues, lostDests) {
+async function queryQueues(pool, from, to, inboundChannels, outboundChannels, queues, lostDests, queueAliases = {}) {
   if (!queues || queues.length === 0) return [];
 
   const [rows] = await pool.query(
@@ -345,7 +345,7 @@ async function queryQueues(pool, from, to, inboundChannels, outboundChannels, qu
   const validDsts = new Set([...queues, ...lostDests]);
   const result = {};
   for (const q of queues) {
-    result[q] = { queue: q, label: `Cola ${q}`, total: 0, ANSWERED: 0, 'NO ANSWER': 0, FAILED: 0 };
+    result[q] = { queue: q, label: queueAliases[q] || `Cola ${q}`, total: 0, ANSWERED: 0, 'NO ANSWER': 0, FAILED: 0 };
   }
   result['__lost__'] = { queue: '__lost__', label: 'Perdidas', total: 0, ANSWERED: 0, 'NO ANSWER': 0, FAILED: 0 };
 
@@ -482,6 +482,15 @@ async function startServer() {
     }
   }
 
+  // Migrar queueAliases de config.json (solo lectura en Docker) → SQLite
+  if (config.queueAliases && typeof config.queueAliases === 'object') {
+    const existing = configService.getQueueAliases(db);
+    if (Object.keys(existing).length === 0 && Object.keys(config.queueAliases).length > 0) {
+      configService.setConfigValue(db, 'queue_aliases', JSON.stringify(config.queueAliases));
+      console.log('[CONFIG] queueAliases migrados de config.json a SQLite.');
+    }
+  }
+
   // ── SSE — broadcast helper (declarado temprano para pbxHealthService) ──
   const sseClients = new Set();
 
@@ -584,6 +593,10 @@ async function startServer() {
 
   function getAliases()  { return configService.getChannelAliases(db); }
   function getAppName()  { return config.app?.name || 'Call Monitor'; }
+  // Nombre efectivo: fuente única = companyName (SQLite) con fallback a config.app.name
+  function resolveEffectiveAppName() {
+    return configService.getConfigValue(db, 'companyName', getAppName()) || getAppName();
+  }
 
   async function fetchData(from, to) {
     const businessHours = configService.getBusinessHours(db);
@@ -601,7 +614,7 @@ async function startServer() {
       queryHourly(pool, from, to, inboundChannels, outboundChannels, 'in', lostDests, businessHours),
       queryStats(pool, from, to, inboundChannels, outboundChannels, 'out', lostDests, businessHours),
       queryChannels(pool, from, to, inboundChannels, outboundChannels, 'out', lostDests),
-      queryQueues(pool, from, to, inboundChannels, outboundChannels, configQueues, lostDests),
+      queryQueues(pool, from, to, inboundChannels, outboundChannels, configQueues, lostDests, configService.getQueueAliases(db)),
     ]);
     return {
       stats: totalStats, channels: totalChannels, hourly: totalHourly,
@@ -609,7 +622,7 @@ async function startServer() {
       outbound: { stats: outStats, channels: outChannels },
       queues,
       channelAliases: getAliases(),
-      appName: getAppName(),
+      appName: resolveEffectiveAppName(),
       businessHours,
       from, to,
       generatedAt: new Date().toISOString(),
@@ -698,17 +711,7 @@ async function startServer() {
 
   app.get('/api/config/public', (req, res) => {
     const subcompanyName = configService.getConfigValue(db, 'subcompanyName', '') || '';
-    res.json({ appName: getAppName(), subcompanyName, dbTimezone: config.db?.timezone || null });
-  });
-
-  app.put('/api/admin/app', requireAdmin, (req, res) => {
-    const { name } = req.body || {};
-    if (typeof name !== 'string' || !name.trim())
-      return res.status(400).json({ ok: false, error: 'El campo name es requerido' });
-    if (!config.app) config.app = {};
-    config.app.name = name.trim();
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
-    res.json({ ok: true, name: config.app.name });
+    res.json({ appName: resolveEffectiveAppName(), subcompanyName, dbTimezone: config.db?.timezone || null });
   });
 
   app.get('/api/admin/channels', requireAdmin, (req, res) => {
@@ -737,6 +740,25 @@ async function startServer() {
 
     configService.setChannelAlias(db, channel, alias);
     res.json({ ok: true, channel, alias: alias.trim() });
+  });
+
+  app.get('/api/admin/queues', requireAdmin, (req, res) => {
+    const aliases = configService.getQueueAliases(db);
+    const queues = configQueues.map(q => ({ queue: q, alias: aliases[q] || '' }));
+    res.json({ ok: true, queues });
+  });
+
+  app.put('/api/admin/queues', requireAdmin, (req, res) => {
+    const { queue, alias } = req.body || {};
+    if (typeof queue !== 'string' || !queue.trim())
+      return res.status(400).json({ ok: false, error: 'El campo queue es requerido' });
+    if (typeof alias !== 'string')
+      return res.status(400).json({ ok: false, error: 'El campo alias es requerido' });
+    if (!configQueues.includes(queue))
+      return res.status(404).json({ ok: false, error: 'Cola no encontrada' });
+
+    configService.setQueueAlias(db, queue, alias);
+    res.json({ ok: true, queue, alias: alias.trim() });
   });
 
   // SPA catch-all (producción)

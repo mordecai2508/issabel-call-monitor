@@ -7,6 +7,7 @@ import InboundView from './components/InboundView';
 import OutboundView from './components/OutboundView';
 import HistoricalView from './components/HistoricalView';
 import ChannelAliasManager from './components/ChannelAliasManager';
+import QueueAliasManager from './components/QueueAliasManager';
 import UserManagement from './components/UserManagement';
 import InboundTable from './components/InboundTable';
 import OutboundTable from './components/OutboundTable';
@@ -56,6 +57,7 @@ function AppRoutes() {
         <Route path="reports" element={<PrivateRoute><ReportsModule /></PrivateRoute>} />
         <Route path="alerts" element={<PrivateRoute><AlertsPanel /></PrivateRoute>} />
         <Route path="channels"    element={<AdminRoute><ChannelAliasManager /></AdminRoute>} />
+        <Route path="queues"      element={<AdminRoute><QueueAliasManager /></AdminRoute>} />
         <Route path="admin/users" element={<AdminRoute><UserManagement /></AdminRoute>} />
         <Route path="admin/config" element={<AdminRoute><SystemConfig /></AdminRoute>} />
         <Route path="admin/alerts" element={<AdminRoute><AlertRulesManager /></AdminRoute>} />
